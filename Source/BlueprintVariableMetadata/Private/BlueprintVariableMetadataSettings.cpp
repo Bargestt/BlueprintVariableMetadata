@@ -94,7 +94,7 @@ UBlueprintVariableMetadataSettings::UBlueprintVariableMetadataSettings()
 		TEXT("Used for FString and FText properties.\nIndicates that the edit field is a secret field (e.g a password) and entered text will be replaced with dots. Do not use this as your only security measure.  The property data is still stored as plain text. "));
 	AddDefaultMeta(TEXT("GetOptions"), true,  TEXT(""), 
 		TEXT("NameProperty, StrProperty"), 
-		TEXT("Causes FString and FName properties to have a limited set of options generated dynamically, e.g. meta=(GetOptions=\"FuncName\").\nSupports external static function references via \"Module.Class.Function\" syntax.\n\nUFUNCTION()\nTArray<FString> FuncName() const; // Always return string array even if FName property."));
+		TEXT("For Native Functions Only!\nCauses FString and FName properties to have a limited set of options generated dynamically, e.g. meta=(GetOptions=\"FuncName\").\nSupports external static function references via \"Module.Class.Function\" syntax.\n\nUFUNCTION()\nTArray<FString> FuncName() const; // Always return string array even if FName property."));
 
 
 	//Class and objects utility
