@@ -56,6 +56,7 @@ void FMetaDataOptionCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> P
 
 void FMetaDataOptionCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> PropertyHandle, IDetailChildrenBuilder& ChildBuilder, IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
+	ChildBuilder.AddProperty(PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FMetaDataOption, BlueprintNamespace)).ToSharedRef());
 	ChildBuilder.AddProperty(PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FMetaDataOption, Description)).ToSharedRef());
 }
 

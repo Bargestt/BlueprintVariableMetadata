@@ -238,6 +238,15 @@ TSharedRef<SWidget> FBlueprintVariableMetadataCustomization::GetAddMetaDataDropd
 			continue;
 		}
 
+		if (!OptionSettings.BlueprintNamespace.IsNull())
+		{
+			UClass* BlueprintClass = BlueprintPtr.IsValid() ? BlueprintPtr->GeneratedClass->GetAuthoritativeClass() : nullptr;
+			if (BlueprintClass == nullptr || !BlueprintClass->IsChildOf(OptionSettings.BlueprintNamespace.ResolveClass()))
+			{
+				continue;
+			}
+		}
+
 		if (!IsPropertyAllowed(OptionSettings.RestrictToTypes))
 		{
 			continue;

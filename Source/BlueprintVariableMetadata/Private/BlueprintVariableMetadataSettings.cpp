@@ -178,6 +178,18 @@ UBlueprintVariableMetadataSettings::UBlueprintVariableMetadataSettings()
 		TEXT("GameplayTag, GameplayTagContainer"), 
 		TEXT("Limit tag selection to specified tag categories"));
 
+
+	// Widget
+	// Only optional binds are exposed, because mandatory binds will contradict "Cosmetic Only" meta data
+	AddDefaultMeta(TEXT("BindWidgetOptional"), true, TEXT(""),
+		TEXT("ObjectProperty"),
+		TEXT("This property optionally allows a widget be bound to it in the designer.\nAllows easy native access to designer defined controls."))
+		.BlueprintNamespace = FSoftClassPath(TEXT("/Script/UMG.Widget"));
+
+	AddDefaultMeta(TEXT("BindWidgetAnimOptional"), true, TEXT(""),
+		TEXT("ObjectProperty"),
+		TEXT("This property optionally allows a animation widget be bound to it in the designer.\nAllows easy native access to designer defined animation."))
+		.BlueprintNamespace = FSoftClassPath(TEXT("/Script/UMG.Widget"));
 	
 }
 
@@ -196,9 +208,9 @@ void UBlueprintVariableMetadataSettings::PostEditChangeProperty(struct FProperty
 }
 #endif // WITH_EDITOR
 
-void UBlueprintVariableMetadataSettings::AddDefaultMeta(FName Key, bool bEnabled /*= true*/, FString DefaultValue /*= TEXT("")*/, FString RestrictToTypes /*= TEXT("")*/, FString Description /*= TEXT("")*/)
+FMetaDataOption& UBlueprintVariableMetadataSettings::AddDefaultMeta(FName Key, bool bEnabled /*= true*/, FString DefaultValue /*= TEXT("")*/, FString RestrictToTypes /*= TEXT("")*/, FString Description /*= TEXT("")*/)
 {
-	DefaultOptions.Add(Key, FMetaDataOption(bEnabled, DefaultValue, RestrictToTypes, Description));
+	return DefaultOptions.Add(Key, FMetaDataOption(bEnabled, DefaultValue, RestrictToTypes, Description));
 }
 
 FMetaDataOption UBlueprintVariableMetadataSettings::GetOption(FName Key) const

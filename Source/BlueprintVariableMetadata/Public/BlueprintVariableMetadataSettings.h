@@ -23,6 +23,10 @@ struct FMetaDataOption
 	UPROPERTY(EditAnywhere)
 	FString RestrictToTypes;
 
+	/** This meta allowed for blueprints of this class */
+	UPROPERTY(EditAnywhere)
+	FSoftClassPath BlueprintNamespace;
+
 	UPROPERTY(EditAnywhere)
 	FString Description;
 	
@@ -30,6 +34,7 @@ struct FMetaDataOption
 		: bEnabled(bEnabled)
 		, DefaultValue(DefaultValue)
 		, RestrictToTypes(RestrictToTypes)		
+		, BlueprintNamespace()
 		, Description(Description)
 	{ }
 };
@@ -52,7 +57,7 @@ class BLUEPRINTVARIABLEMETADATA_API UBlueprintVariableMetadataSettings : public 
 	void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif // WITH_EDITOR
 
-	void AddDefaultMeta(FName Key, bool bEnabled = true, FString DefaultValue = TEXT(""), FString RestrictToTypes = TEXT(""), FString Description = TEXT(""));
+	FMetaDataOption& AddDefaultMeta(FName Key, bool bEnabled = true, FString DefaultValue = TEXT(""), FString RestrictToTypes = TEXT(""), FString Description = TEXT(""));
 public:
 	FMetaDataOption GetOption(FName Key) const;
 	bool IsRestricted(FName Key) const;
