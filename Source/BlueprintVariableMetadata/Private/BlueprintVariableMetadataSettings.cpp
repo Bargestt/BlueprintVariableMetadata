@@ -81,8 +81,12 @@ UBlueprintVariableMetadataSettings::UBlueprintVariableMetadataSettings()
 	AddDefaultMeta(TEXT("TitleProperty"), true,  TEXT("FuncName"),  
 		TEXT("ArrayProperty, SetProperty, MapProperty"), 
 		TEXT("Used by arrays of structs.\nIndicates a single property inside of the struct that should be used as a title summary when the array entry is collapsed."));
-	
-		
+	AddDefaultMeta(TEXT("ForceInlineRow"), true, TEXT(""),
+		TEXT("MapProperty"),
+		TEXT("Create the property editor in title row if struct has customization"));
+	AddDefaultMeta(TEXT("ReadOnlyKeys"), true, TEXT(""),
+		TEXT("MapProperty"),
+		TEXT("Make map keys read only"));
 
 		
 	// Strings		
