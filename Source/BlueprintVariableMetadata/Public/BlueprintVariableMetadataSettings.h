@@ -82,6 +82,10 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = "Add New")
 	bool bShowAddedOptions;
 
+	/** Disable filtering by property type */
+	UPROPERTY(config, EditAnywhere, Category = "Add New")
+	bool bDisableTypeFiltering;
+
 	/** Disable custom key option. Forces MetaDataOptions use  */
 	UPROPERTY(config, EditAnywhere, Category = "Add New")
 	bool bDisableCustomOption;

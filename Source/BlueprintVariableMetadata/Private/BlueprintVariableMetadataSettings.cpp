@@ -15,11 +15,7 @@ UBlueprintVariableMetadataSettings::UBlueprintVariableMetadataSettings()
 		TEXT("BlueprintPrivate"), 
 		TEXT("Bitmask"),
 		TEXT("BitmaskEnum"), 
-		TEXT("DeprecationMessage"),
-		TEXT("UIMin"),
-		TEXT("UIMax"),
-		TEXT("ClampMin"),
-		TEXT("ClampMax")
+		TEXT("DeprecationMessage")
 	});
 
 	DefaultOptions.Reset();
@@ -71,12 +67,28 @@ UBlueprintVariableMetadataSettings::UBlueprintVariableMetadataSettings()
 	AddDefaultMeta(TEXT("SliderExponent"), true,  TEXT(""),  
 		TEXT("ByteProperty, DoubleProperty, IntProperty, int64Property"), 
 		TEXT("Used by numeric properties.\nIndicates how rapidly the value will grow when moving an unbounded slider."));	
+	
 	AddDefaultMeta(TEXT("Units"), true, TEXT(""),
 		TEXT("ByteProperty, DoubleProperty, IntProperty, int64Property"),
 		TEXT("Used on any numeric property to declare the internal units for a property. See UnitConversion.h/cpp for details.\nIf editor preferances allow, properties marked up with Units= will be displayed in the user's locale preference,\nand/or in the most appropriate unit for the value's magnitude (ie, showing cm as km, or bytes as megabytes etc)."));
 	AddDefaultMeta(TEXT("ForceUnits"), true, TEXT(""),
 		TEXT("ByteProperty, DoubleProperty, IntProperty, int64Property"),
 		TEXT("Used instead of 'Units' metadata to forcibly show a property in a fixed unit, without locale or other conversion. See UnitConversion.h/cpp for details"));
+
+	AddDefaultMeta(TEXT("UIMin"), true, TEXT("Used for float and integer properties.  Specifies the lowest that the value slider should represent."),
+		TEXT("ByteProperty, DoubleProperty, IntProperty, int64Property"),
+		TEXT(""));
+	AddDefaultMeta(TEXT("UIMax"), true, TEXT("Used for float and integer properties.  Specifies the highest that the value slider should represent."),
+		TEXT("ByteProperty, DoubleProperty, IntProperty, int64Property"),
+		TEXT(""));
+	AddDefaultMeta(TEXT("ClampMin"), true, TEXT("Used for float and integer properties.  Specifies the minimum value that may be entered for the property."),
+		TEXT("ByteProperty, DoubleProperty, IntProperty, int64Property"),
+		TEXT(""));
+	AddDefaultMeta(TEXT("ClampMax"), true, TEXT("Used for float and integer properties.  Specifies the maximum value that may be entered for the property."),
+		TEXT("ByteProperty, DoubleProperty, IntProperty, int64Property"),
+		TEXT(""));
+
+
 
 		
 	//Containers		

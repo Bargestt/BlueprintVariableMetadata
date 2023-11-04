@@ -160,25 +160,29 @@ void FBlueprintVariableMetadataCustomization::CustomizeDetails(IDetailLayoutBuil
 							.HAlign(HAlign_Fill)
 							.VAlign(VAlign_Fill)
 							[
-								SNew(SMultiLineEditableTextBox)
-								.Text(FText::FromString(MetaDataEntry.DataValue))
-								.Font(IDetailLayoutBuilder::GetDetailFont())
-								.OnTextCommitted(FOnTextCommitted::CreateSP(this, &FBlueprintVariableMetadataCustomization::MetaValueChanged, MetaDataKey))
-								.IsReadOnly(bIsRestricted)
-								.ModiferKeyForNewLine(EModifierKey::Shift)
-								.SelectAllTextWhenFocused(false)
-								.ClearKeyboardFocusOnCommit(false)								
-								.SelectAllTextOnCommit(false)
-								.WrapTextAt(200.0f)
+								SNew(SBox)
+								.MinDesiredWidth(50.0f)
+								[
+									SNew(SMultiLineEditableTextBox)
+									.Text(FText::FromString(MetaDataEntry.DataValue))
+									.Font(IDetailLayoutBuilder::GetDetailFont())
+									.OnTextCommitted(FOnTextCommitted::CreateSP(this, &FBlueprintVariableMetadataCustomization::MetaValueChanged, MetaDataKey))
+									.IsReadOnly(bIsRestricted)
+									.ModiferKeyForNewLine(EModifierKey::Shift)
+									.SelectAllTextWhenFocused(false)
+									.ClearKeyboardFocusOnCommit(false)								
+									.SelectAllTextOnCommit(false)
+									.WrapTextAt(200.0f)
+								]
 							]
 							+SHorizontalBox::Slot()
 							.AutoWidth()
 							.VAlign(VAlign_Center)
-							[
+							[								
 								PropertyCustomizationHelpers::MakeRemoveButton(
 									FSimpleDelegate::CreateSP(this, &FBlueprintVariableMetadataCustomization::RemoveMetadata, MetaDataKey),
 									FText::GetEmpty(), 
-									!bIsRestricted)
+									!bIsRestricted)								
 							]
 						];
             	}
@@ -247,7 +251,7 @@ TSharedRef<SWidget> FBlueprintVariableMetadataCustomization::GetAddMetaDataDropd
 			}
 		}
 
-		if (!IsPropertyAllowed(OptionSettings.RestrictToTypes))
+		if (!Settings->bDisableTypeFiltering && !IsPropertyAllowed(OptionSettings.RestrictToTypes))
 		{
 			continue;
 		}
