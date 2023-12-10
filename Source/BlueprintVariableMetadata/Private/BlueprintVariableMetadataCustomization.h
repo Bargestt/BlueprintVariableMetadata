@@ -22,9 +22,7 @@ public:
 
 
 private:
-	TSharedRef<SWidget> GetAddMetaDataDropdown();
-
-	bool IsPropertyAllowed(const FString& Filter) const;
+	TSharedRef<SWidget> GetAddMetaDataDropdown();	
 
 	void AddMetadata(FName MetaDataKey);
 	void RemoveMetadata(FName MetaDataKey);
@@ -33,7 +31,13 @@ private:
 	void MetaKeyChanged(const FText& NewKeyName, ETextCommit::Type ChangeType, FName OldKeyName);
 	void MetaValueChanged(const FText& NewValueName, ETextCommit::Type ChangeType, FName KeyName);
 
+private:
+	static TArray<FName> GetPropertyInfo(const FProperty* Property);
+	static bool GetPropertyTypeName(const FProperty* Property, FName& PropertyType);
 
+	static bool IsPropertyAllowed(const FProperty* TargetProperty, const FString& Filter);
+
+private:
 	TWeakPtr<IBlueprintEditor> BlueprintEditorPtr;
 	TWeakObjectPtr<UBlueprint> BlueprintPtr;
 	TWeakFieldPtr<FProperty> PropertyBeingCustomized;

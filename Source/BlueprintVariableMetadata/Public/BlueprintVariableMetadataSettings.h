@@ -7,6 +7,35 @@
 #include "BlueprintVariableMetadataSettings.generated.h"
 
 
+
+
+
+/**  */
+USTRUCT()
+struct FMetadataFilterGroup
+{
+	GENERATED_BODY()
+	
+public:
+	UPROPERTY(EditAnywhere)
+	FString Name;
+
+	/** Comma separated list of property types */
+	UPROPERTY(EditAnywhere)
+	FString RestrictToTypes;
+
+	/** Blueprint must be child of any of specified classes */
+	UPROPERTY(EditAnywhere, meta = (AllowAbstract=true))
+	TArray<FSoftClassPath> BlueprintNamespace;
+
+	UPROPERTY(EditAnywhere)
+	FString Description;
+
+};
+
+
+
+
 /**  */
 USTRUCT()
 struct FMetaDataOption
@@ -16,16 +45,24 @@ struct FMetaDataOption
 	UPROPERTY(EditAnywhere)
 	bool bEnabled;
 
+
+	UPROPERTY(EditAnywhere)
+	FString Key;
+
 	UPROPERTY(EditAnywhere)
 	FString DefaultValue;
+
+	UPROPERTY(EditAnywhere)
+	FString Category;
+
+
+	UPROPERTY(EditAnywhere, meta = (GetOptions = "BlueprintVariableMetadata.BlueprintVariableMetadataSettings.GetGroupOptions"))
+	FString Group;
 
 	/** Comma separated list of property types */
 	UPROPERTY(EditAnywhere)
 	FString RestrictToTypes;
 
-	/** This meta allowed for blueprints of this class */
-	UPROPERTY(EditAnywhere)
-	FSoftClassPath BlueprintNamespace;
 
 	UPROPERTY(EditAnywhere)
 	FString Description;
@@ -34,22 +71,21 @@ struct FMetaDataOption
 		: bEnabled(bEnabled)
 		, DefaultValue(DefaultValue)
 		, RestrictToTypes(RestrictToTypes)		
-		, BlueprintNamespace()
 		, Description(Description)
 	{ }
+
+public:
 };
+
 
 
 /**
  * 
  */
-UCLASS(Config = EditorPerProjectUserSettings, defaultconfig, meta = (DisplayName = "Blueprint Variable Metadata"))
+UCLASS(Config = Editor, defaultconfig, meta = (DisplayName = "Blueprint Variable Metadata"))
 class BLUEPRINTVARIABLEMETADATA_API UBlueprintVariableMetadataSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
-
-	virtual FName GetContainerName() const override { return TEXT("Project"); }
-	virtual FName GetCategoryName() const override { return TEXT("Editor"); }
 
 	UBlueprintVariableMetadataSettings();
 	virtual void PostInitProperties() override;	
@@ -57,48 +93,108 @@ class BLUEPRINTVARIABLEMETADATA_API UBlueprintVariableMetadataSettings : public 
 	void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif // WITH_EDITOR
 
-	FMetaDataOption& AddDefaultMeta(FName Key, bool bEnabled = true, FString DefaultValue = TEXT(""), FString RestrictToTypes = TEXT(""), FString Description = TEXT(""));
 public:
-	FMetaDataOption GetOption(FName Key) const;
-	bool IsRestricted(FName Key) const;
+	UPROPERTY(VisibleAnywhere, Instanced, Category = "Default")
+	TObjectPtr<class UDefaultBlueprintVariableMetadataSettings> DefaultOptions;
 
-public:
-	
+
+	UPROPERTY(config, EditAnywhere, Category = "Display")
+	bool bShowInAdvanced;
+
 	/** Show restricted options in meta data list. You wont be able to edit them */
 	UPROPERTY(config, EditAnywhere, Category = "Display")
 	bool bShowRestrictedOptions;
 
-
-	/** Non editable meta data options */
-	UPROPERTY(VisibleAnywhere, Category = "Display")
-	TSet<FName> SystemRestrictedOptions;
-
 	/** Non editable meta data options. User specified */
 	UPROPERTY(config, EditAnywhere, Category = "Display")
-	TSet<FName> UserRestrictedOptions;
+	TSet<FName> RestrictedOptions;
 
 
 	/** Show options that were already added */
 	UPROPERTY(config, EditAnywhere, Category = "Add New")
 	bool bShowAddedOptions;
 
-	/** Disable filtering by property type */
-	UPROPERTY(config, EditAnywhere, Category = "Add New")
-	bool bDisableTypeFiltering;
+//	#TODO
+// 	UPROPERTY(config, EditAnywhere, Category = "Add New")
+// 	bool bPreserveOrder;
 
-	/** Disable custom key option. Forces MetaDataOptions use  */
+	/** Disable filtering by property type. It will show everything */
 	UPROPERTY(config, EditAnywhere, Category = "Add New")
-	bool bDisableCustomOption;
+	bool bEnableFiltering;
 
-	/** Display property class in metadata category */
+	/** Disable custom key option. */
 	UPROPERTY(config, EditAnywhere, Category = "Add New")
-	bool bDisplayPropertyType;
+	bool bShowCustomOption;
+
+	UPROPERTY(config, EditAnywhere, Category = "Add New")
+	bool bEnableCategories;
+
+	/** Display categories in same order as in here. Missing properties are pushed to bottom */
+	UPROPERTY(config, EditAnywhere, Category = "Add New", meta = (EditCondition = "bEnableCategories"))
+	TArray<FString> CategoryOrder;
+
+	/** Group is predefined filter for metadata. Also can combine meta in categories */
+	UPROPERTY(config, EditAnywhere, Category = "Add New", meta = (TitleProperty = "{Group}: {Description}\n{RestrictToTypes}"))
+	TArray<FMetadataFilterGroup> Groups;
 
 	/** Options when adding new metadata. Check ObjectMacros.h for info */
 	UPROPERTY(config, EditAnywhere, Category = "Add New")
-	TMap<FName, FMetaDataOption> MetaDataOptions;
+	TArray<FMetaDataOption> Options;
 
-	UPROPERTY(VisibleAnywhere, Category = "Add New", meta = (NoClear, EditFixedSize, NoResetToDefault))
-	TMap<FName, FMetaDataOption> DefaultOptions;
 
+public:
+	void Rebuild();
+
+	UFUNCTION()
+	static TArray<FString> GetGroupOptions();
+
+	TMap<FName, FMetaDataOption> CollectAllOptions() const;
+	TMap<FName, FMetadataFilterGroup> CollectAllGroups() const;
+
+
+	const FMetaDataOption* GetOptionPtr(FName Key) const;
+	const FMetaDataOption& GetOption(FName Key) const;
+
+	bool IsRestricted(FName Key) const;
+
+	bool IsReadOnly_Key(FName Key) const;
+
+
+	FString GetMetaCategory(const FName& Key) const;
+	int32 GetCategoryPriority(const FString& Category) const;
+	
+
+
+private:
+	FMetaDataOption InvalidOption;
+
+	TMap<FName, int32> MetaDataIndex;
+	TMap<FName, int32> MetaDataIndex_Default;
+};
+
+
+/**
+ * Default settings
+ */
+UCLASS(config = BlueprintVariableMetadata, defaultconfig)
+class BLUEPRINTVARIABLEMETADATA_API UDefaultBlueprintVariableMetadataSettings : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	/** Editable using DefaultBlueprintVariableMetadata.ini */
+	UPROPERTY(config, VisibleAnywhere, Category = "Default Meta Data")
+	TArray<FString> DefaultCategoryOrder;
+
+	/** Editable using DefaultBlueprintVariableMetadata.ini */
+	UPROPERTY(config, VisibleAnywhere, Category = "Default Meta Data")
+	TArray<FName> RestrictedOptions;
+	
+	/** Editable using DefaultBlueprintVariableMetadata.ini */
+	UPROPERTY(config, VisibleAnywhere, Category = "Default Meta Data", meta = (TitleProperty = "Group"))
+	TArray<FMetadataFilterGroup> Groups;
+
+	/** Editable using DefaultBlueprintVariableMetadata.ini */
+	UPROPERTY(config, VisibleAnywhere, Category = "Default Meta Data")
+	TArray<FMetaDataOption> Options;
 };

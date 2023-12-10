@@ -7,12 +7,14 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailCategoryBuilder.h"
 #include "DetailWidgetRow.h"
+#include <IDetailGroup.h>
 #include "PropertyCustomizationHelpers.h"
 
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include <Widgets/Input/SComboButton.h>
+
 
 #define LOCTEXT_NAMESPACE "BlueprintVariableMetadataCustomization"
 
@@ -40,9 +42,11 @@ FBlueprintVariableMetadataCustomization::FBlueprintVariableMetadataCustomization
 void FBlueprintVariableMetadataCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLayout)
 {
 	PropertyBeingCustomized.Reset();
-	VariableName = NAME_None;
+	VariableName = NAME_None;	
 
-	
+	const FProperty* TargetProperty = nullptr;
+	int32 VariableIndex = INDEX_NONE;
+
 	TArray<TWeakObjectPtr<UObject>> ObjectsBeingCustomized;
 	DetailLayout.GetObjectsBeingCustomized(ObjectsBeingCustomized);
 	if (ObjectsBeingCustomized.Num() > 0)
@@ -50,158 +54,205 @@ void FBlueprintVariableMetadataCustomization::CustomizeDetails(IDetailLayoutBuil
 		UPropertyWrapper* PropertyWrapper = Cast<UPropertyWrapper>(ObjectsBeingCustomized[0].Get());
 		PropertyBeingCustomized = PropertyWrapper ? PropertyWrapper->GetProperty() : nullptr;
 		if (PropertyBeingCustomized.IsValid())
-		{			
+		{	
 			VariableName = PropertyBeingCustomized->GetFName();
-			int32 VariableIndex = FBlueprintEditorUtils::FindNewVariableIndex(BlueprintPtr.Get(), VariableName);
+			VariableIndex = FBlueprintEditorUtils::FindNewVariableIndex(BlueprintPtr.Get(), VariableName);
             if (VariableIndex != INDEX_NONE)
             {
-				const UBlueprintVariableMetadataSettings* Settings = GetDefault<UBlueprintVariableMetadataSettings>();
-
-				FText ControlPanelHeaderText = LOCTEXT("ControlPanel_Header", "Metadata");
-				const FText ControlPanelRowText = LOCTEXT("ControlPanel", "MetaData Control Panel");				
-				const FText ControlPanelHeaderTooltipText = LOCTEXT("ControlPanel_Tooltip", "Variable meta data\nUse with caution!\nConsult with ObjectMacros.h for available options");
-				const FText ControlPanelAddText = LOCTEXT("ControlPanel_Add", "Add");
-				const FText MetadataRowText = LOCTEXT("MetadataRow", "Metadata");
-
-
-				if (Settings->bDisplayPropertyType)
-				{
-					FString PropertyClassName;
-					if (FStructProperty* StructProperty = CastField<FStructProperty>(PropertyBeingCustomized.Get()))
-					{
-						PropertyClassName = StructProperty->Struct ? StructProperty->Struct->GetName() : TEXT("None");
-					}
-					else
-					{
-						PropertyClassName = PropertyBeingCustomized->GetClass()->GetName();
-					}
-
-					ControlPanelHeaderText = FText::FromString(FString::Printf(TEXT("%s (%s)"), *ControlPanelHeaderText.ToString(), *PropertyClassName));
-				}		
-				
-
-				IDetailCategoryBuilder& Category = DetailLayout.EditCategory("Variable");
-
-				Category.AddCustomRow(ControlPanelRowText, true)
-					.NameContent()
-					[
-						SNew(STextBlock)
-						.ToolTip(FSlateApplicationBase::Get().MakeToolTip(ControlPanelHeaderTooltipText))
-						.Text(ControlPanelHeaderText)
-						.Font(IDetailLayoutBuilder::GetDetailFontBold())						
-					]
-					.ValueContent()
-					[
-						SNew(SBox)
-						.HAlign(HAlign_Left)
-						.VAlign(VAlign_Center)
-						[
-							SNew(SComboButton)
-							.OnGetMenuContent(this, &FBlueprintVariableMetadataCustomization::GetAddMetaDataDropdown)
-							.ButtonContent()
-							[
-								SNew(STextBlock)
-								.Font(IDetailLayoutBuilder::GetDetailFont())
-								.Text(ControlPanelAddText)
-							]
-						]
-					];
-			
-				
-
-				
-            	for(const FBPVariableMetaDataEntry& MetaDataEntry : BlueprintPtr->NewVariables[VariableIndex].MetaDataArray)
-            	{
-					const FName MetaDataKey = MetaDataEntry.DataKey;
-
-					bool bIsRestricted = Settings->IsRestricted(MetaDataKey);					
-					if (bIsRestricted && !Settings->bShowRestrictedOptions)
-					{
-						continue;
-					}
-					bool bIsKeyReadOnly = Settings->bDisableCustomOption || Settings->MetaDataOptions.Contains(MetaDataKey) || Settings->DefaultOptions.Contains(MetaDataKey);
-
-
-					// Metadata description text
-					const FText TooltipText = FText::FromString(Settings->GetOption(MetaDataKey).Description);
-
-					TSharedPtr<SWidget> KeyWidget;
-					if (bIsRestricted || bIsKeyReadOnly)
-					{
-						KeyWidget = SNew(STextBlock)
-							.Font(IDetailLayoutBuilder::GetDetailFont())
-							.Text(FText::FromName(MetaDataKey))
-							.ToolTipText(TooltipText);
-					}
-					else 
-					{
-						KeyWidget = SNew(SEditableTextBox)							
-							.Font(IDetailLayoutBuilder::GetDetailFont())
-							.Text(FText::FromName(MetaDataKey))
-							.ToolTipText(TooltipText)
-							.OnVerifyTextChanged(FOnVerifyTextChanged::CreateSP(this, &FBlueprintVariableMetadataCustomization::VerifyMetaKey))
-							.OnTextCommitted(FOnTextCommitted::CreateSP(this, &FBlueprintVariableMetadataCustomization::MetaKeyChanged, MetaDataKey))
-							.IsReadOnly(bIsRestricted || bIsKeyReadOnly)
-							.SelectAllTextWhenFocused(true)
-							.ClearKeyboardFocusOnCommit(false)
-							.SelectAllTextOnCommit(true);
-					}
-            		
-					Category.AddCustomRow(MetadataRowText, true)
-						.NameContent()
-						[
-							KeyWidget.ToSharedRef()
-						]
-						.ValueContent()
-						[
-							SNew(SHorizontalBox)
-							+SHorizontalBox::Slot()
-							.AutoWidth()
-							.HAlign(HAlign_Fill)
-							.VAlign(VAlign_Fill)
-							[
-								SNew(SBox)
-								.MinDesiredWidth(50.0f)
-								[
-									SNew(SMultiLineEditableTextBox)
-									.Text(FText::FromString(MetaDataEntry.DataValue))
-									.Font(IDetailLayoutBuilder::GetDetailFont())
-									.OnTextCommitted(FOnTextCommitted::CreateSP(this, &FBlueprintVariableMetadataCustomization::MetaValueChanged, MetaDataKey))
-									.IsReadOnly(bIsRestricted)
-									.ModiferKeyForNewLine(EModifierKey::Shift)
-									.SelectAllTextWhenFocused(false)
-									.ClearKeyboardFocusOnCommit(false)								
-									.SelectAllTextOnCommit(false)
-									.WrapTextAt(200.0f)
-								]
-							]
-							+SHorizontalBox::Slot()
-							.AutoWidth()
-							.VAlign(VAlign_Center)
-							[								
-								PropertyCustomizationHelpers::MakeRemoveButton(
-									FSimpleDelegate::CreateSP(this, &FBlueprintVariableMetadataCustomization::RemoveMetadata, MetaDataKey),
-									FText::GetEmpty(), 
-									!bIsRestricted)								
-							]
-						];
-            	}
+				TargetProperty = PropertyBeingCustomized.Get();
             }
 		}
 	}
+	if (TargetProperty == nullptr)
+	{
+		return;
+	}
+
+	const UBlueprintVariableMetadataSettings* Settings = GetDefault<UBlueprintVariableMetadataSettings>();
+
+	const FText ControlPanelHeaderText = LOCTEXT("ControlPanel_Header", "Metadata");
+	const FText ControlPanelRowText = LOCTEXT("ControlPanel", "MetaData Control Panel");				
+	const FText ControlPanelHeaderTooltipText = LOCTEXT("ControlPanel_Tooltip", "{0}\n\nVariable meta data\nUse with caution!\nConsult with ObjectMacros.h for available options");
+	const FText ControlPanelAddText = LOCTEXT("ControlPanel_Add", "Add");
+	const FText MetadataRowText = LOCTEXT("MetadataRow", "Metadata");
+	const FText PropertyInfo = FText::FromString(FString::JoinBy(GetPropertyInfo(PropertyBeingCustomized.Get()), TEXT(", "), [](const FName& Entry) { return Entry.ToString(); }));
+				
+
+	IDetailCategoryBuilder& Category = DetailLayout.EditCategory("Variable");
+	IDetailGroup* CategoryGroup = nullptr;
+	if (!Settings->bShowInAdvanced)
+	{
+		CategoryGroup = &Category.AddGroup(TEXT("Meta"), INVTEXT("Meta"));					
+	}
+					
+	// Create control panel
+	// Title | [Button]
+	FDetailWidgetRow& ControlRow = CategoryGroup ? CategoryGroup->HeaderRow() : Category.AddCustomRow(ControlPanelRowText, true);
+	ControlRow
+		.NameContent()
+		[
+			SNew(STextBlock)
+			.ToolTipText(FText::Format(ControlPanelHeaderTooltipText, PropertyInfo))
+			.Text(ControlPanelHeaderText)
+			.Font(IDetailLayoutBuilder::GetDetailFont())						
+		]
+		.ValueContent()
+		[
+			SNew(SBox)
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Center)
+			[
+				SNew(SComboButton)
+				.OnGetMenuContent(this, &FBlueprintVariableMetadataCustomization::GetAddMetaDataDropdown)
+				.ButtonContent()
+				[
+					SNew(STextBlock)
+					.Font(IDetailLayoutBuilder::GetDetailFont())
+					.Text(ControlPanelAddText)
+				]
+			]
+		];
+			
+	
+	// Build metadata entries				
+    for(const FBPVariableMetaDataEntry& MetaDataEntry : BlueprintPtr->NewVariables[VariableIndex].MetaDataArray)
+    {
+		const FName& MetaKey = MetaDataEntry.DataKey;
+		const FString& MetaValue = MetaDataEntry.DataValue;
+
+		bool bIsRestricted = Settings->IsRestricted(MetaKey);					
+		if (bIsRestricted && !Settings->bShowRestrictedOptions)
+		{
+			continue;
+		}
+		bool bIsKeyReadOnly = bIsRestricted || Settings->IsReadOnly_Key(MetaKey);
+
+
+		// Metadata description text
+		const FText TooltipText = FText::FromString(Settings->GetOption(MetaKey).Description);
+
+		TSharedPtr<SWidget> KeyWidget;
+		if (bIsKeyReadOnly)
+		{
+			KeyWidget = SNew(STextBlock)
+				.Font(IDetailLayoutBuilder::GetDetailFont())
+				.Text(FText::FromName(MetaKey))
+				.ToolTipText(TooltipText);
+		}
+		else 
+		{
+			KeyWidget = SNew(SEditableTextBox)							
+				.Font(IDetailLayoutBuilder::GetDetailFont())
+				.Text(FText::FromName(MetaKey))
+				.ToolTipText(TooltipText)
+				.OnVerifyTextChanged(FOnVerifyTextChanged::CreateSP(this, &FBlueprintVariableMetadataCustomization::VerifyMetaKey))
+				.OnTextCommitted(FOnTextCommitted::CreateSP(this, &FBlueprintVariableMetadataCustomization::MetaKeyChanged, MetaKey))
+				.IsReadOnly(bIsRestricted || bIsKeyReadOnly)
+				.SelectAllTextWhenFocused(true)
+				.ClearKeyboardFocusOnCommit(false)
+				.SelectAllTextOnCommit(true);
+		}
+            		
+					
+		FDetailWidgetRow& MetaRow = CategoryGroup ? CategoryGroup->AddWidgetRow() : Category.AddCustomRow(MetadataRowText, true);
+		MetaRow
+			.NameContent()
+			[
+				KeyWidget.ToSharedRef()
+			]
+			.ValueContent()
+			[
+				SNew(SHorizontalBox)
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.HAlign(HAlign_Fill)
+				.VAlign(VAlign_Fill)
+				[
+					SNew(SBox)
+					.MinDesiredWidth(50.0f)
+					[
+						SNew(SMultiLineEditableTextBox)
+						.Text(FText::FromString(MetaDataEntry.DataValue))
+						.Font(IDetailLayoutBuilder::GetDetailFont())
+						.OnTextCommitted(FOnTextCommitted::CreateSP(this, &FBlueprintVariableMetadataCustomization::MetaValueChanged, MetaKey))
+						.IsReadOnly(bIsRestricted)
+						.ModiferKeyForNewLine(EModifierKey::Shift)
+						.SelectAllTextWhenFocused(false)
+						.ClearKeyboardFocusOnCommit(false)								
+						.SelectAllTextOnCommit(false)
+						.WrapTextAt(200.0f)
+					]
+				]
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[								
+					PropertyCustomizationHelpers::MakeRemoveButton(
+						FSimpleDelegate::CreateSP(this, &FBlueprintVariableMetadataCustomization::RemoveMetadata, MetaKey),
+						FText::GetEmpty(), 
+						!bIsRestricted)								
+				]
+			];
+    }
 }
 
 TSharedRef<SWidget> FBlueprintVariableMetadataCustomization::GetAddMetaDataDropdown()
 {
-	const FText MetadataAddTooltipText = LOCTEXT("MetadataAdd_Tooltip", "Adds new meta data");
-	const FText NoMetaDataToAdd = LOCTEXT("MetadataAdd_NoOptions", "Nothing to add");
-
 	FMenuBuilder MenuBuilder(true, nullptr);
 
 	const UBlueprintVariableMetadataSettings* Settings = GetDefault<UBlueprintVariableMetadataSettings>();
 
-	bool bIsEmpty = true;
-	if (!Settings->bDisableCustomOption)
+	const FText MetadataAddTooltipText = LOCTEXT("MetadataAdd_Tooltip", "Adds new meta data");
+	const FText NoMetaDataToAdd = LOCTEXT("MetadataAdd_NoOptions", "Nothing to add");
+
+	const auto CanExecute_False = FCanExecuteAction::CreateLambda([]() { return false; });
+	
+	bool bIsEmpty = true;	
+
+	UClass* BlueprintClass = nullptr;
+	if (UBlueprint* Blueprint = BlueprintPtr.Get())
+	{
+		if (Blueprint->GeneratedClass)
+		{
+			BlueprintClass = Blueprint->GeneratedClass->GetAuthoritativeClass();
+		}		
+	}
+	
+	if (BlueprintClass == nullptr)
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("MetadataAdd_BlueprintError", "Blueprint error"),
+			FText::GetEmpty(),
+			FSlateIcon(),
+			FUIAction(
+				FExecuteAction(),
+				CanExecute_False,
+				FIsActionChecked(),
+				FIsActionButtonVisible()
+			)
+		);
+		return MenuBuilder.MakeWidget();
+	}
+
+	const FProperty* TargetProperty = PropertyBeingCustomized.Get();
+	if (TargetProperty == nullptr)
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("MetadataAdd_PropertyError", "Property error"),
+			FText::GetEmpty(),
+			FSlateIcon(),
+			FUIAction(
+				FExecuteAction(),
+				CanExecute_False,
+				FIsActionChecked(),
+				FIsActionButtonVisible()
+			)
+		);
+		return MenuBuilder.MakeWidget();
+	}
+
+	
+	if (Settings->bShowCustomOption)
 	{
 		bIsEmpty = false;
 		MenuBuilder.AddMenuEntry(
@@ -215,24 +266,23 @@ TSharedRef<SWidget> FBlueprintVariableMetadataCustomization::GetAddMetaDataDropd
 				FIsActionButtonVisible()
 			)
 		);
-	}	
-
-
-	TMap<FName, FMetaDataOption> AllOptions = Settings->MetaDataOptions;
-	for (const auto& OptionPair : Settings->DefaultOptions)
-	{
-		if (!AllOptions.Contains(OptionPair.Key))
-		{
-			AllOptions.Add(OptionPair.Key, OptionPair.Value);
-		}
 	}
+	
+	struct FDisplayedMetaOption
+	{
+		bool bEnabled;
+		const FMetaDataOption* Option;
+	};
+	TMap<FString, TArray<FDisplayedMetaOption>> DisplayedMetas;
 
+	TMap<FName, FMetadataFilterGroup> AllGroups = Settings->CollectAllGroups();
+	TMap<FName, FMetaDataOption> AllOptions = Settings->CollectAllOptions();	
 	for (const auto& OptionPair : AllOptions)
 	{
-		const FName Option = OptionPair.Key;
+		const FName MetaKey = OptionPair.Key;
 		const FMetaDataOption& OptionSettings = OptionPair.Value;
 
-		if (Option.IsNone())
+		if (MetaKey.IsNone())
 		{
 			continue;
 		}
@@ -242,44 +292,89 @@ TSharedRef<SWidget> FBlueprintVariableMetadataCustomization::GetAddMetaDataDropd
 			continue;
 		}
 
-		if (!OptionSettings.BlueprintNamespace.IsNull())
+		const FMetadataFilterGroup* OptionGroup = AllGroups.Find(*OptionSettings.Group);
+
+		if (Settings->bEnableFiltering)
 		{
-			UClass* BlueprintClass = BlueprintPtr.IsValid() ? BlueprintPtr->GeneratedClass->GetAuthoritativeClass() : nullptr;
-			if (BlueprintClass == nullptr || !BlueprintClass->IsChildOf(OptionSettings.BlueprintNamespace.ResolveClass()))
+			bool bChildOfAny = true;
+
+			if (OptionGroup && OptionGroup->BlueprintNamespace.Num() > 0)
+			{
+				for (const FSoftClassPath& Path : OptionGroup->BlueprintNamespace)
+				{
+					if (Path.IsNull() || BlueprintClass->IsChildOf(Path.ResolveClass()))
+					{
+						bChildOfAny = true;
+						break;
+					}
+				}
+			}			
+
+			if (!bChildOfAny)
+			{
+				continue;
+			}
+
+			if (!IsPropertyAllowed(TargetProperty, OptionSettings.RestrictToTypes))
+			{
+				continue;
+			}
+
+			if (OptionGroup && !IsPropertyAllowed(TargetProperty, OptionGroup->RestrictToTypes))
 			{
 				continue;
 			}
 		}
 
-		if (!Settings->bDisableTypeFiltering && !IsPropertyAllowed(OptionSettings.RestrictToTypes))
-		{
-			continue;
-		}
-
 		bool bAlreadyExists = false;
 		{
 			FString Value;
-			bAlreadyExists = FBlueprintEditorUtils::GetBlueprintVariableMetaData(BlueprintPtr.Get(), VariableName, nullptr, Option, Value);
+			bAlreadyExists = FBlueprintEditorUtils::GetBlueprintVariableMetaData(BlueprintPtr.Get(), VariableName, nullptr, MetaKey, Value);
 		}
 		if (bAlreadyExists && !Settings->bShowAddedOptions)
 		{
 			continue;
 		}
 
-		bIsEmpty = false;
-		MenuBuilder.AddMenuEntry(
-			FText::FromName(Option),
-			FText::FromString(OptionSettings.Description),
-			FSlateIcon(),
-			FUIAction(
-				FExecuteAction::CreateSP(this, &FBlueprintVariableMetadataCustomization::AddMetadata, Option),
-				FCanExecuteAction::CreateLambda([bAlreadyExists]() { return !bAlreadyExists; }),
-				FIsActionChecked(),
-				FIsActionButtonVisible()
-			)
-		);
+		FDisplayedMetaOption DisplayedOption;
+		DisplayedOption.bEnabled = !bAlreadyExists;
+		DisplayedOption.Option = &OptionSettings;
+		DisplayedMetas.FindOrAdd(Settings->GetMetaCategory(MetaKey)).Add(DisplayedOption);
 	}
 
+
+	DisplayedMetas.KeyStableSort([Settings](const FString& A, const FString& B)
+	{
+		return Settings->GetCategoryPriority(A) < Settings->GetCategoryPriority(B);
+	});
+	for (const auto& Category : DisplayedMetas)
+	{
+		const TArray<FDisplayedMetaOption>& Entries = Category.Value;
+
+		MenuBuilder.BeginSection(*Category.Key, FText::FromString(Category.Key));
+
+		for (const FDisplayedMetaOption& DisplayedOption : Entries)
+		{
+			const FMetaDataOption& Option = *DisplayedOption.Option;
+			bool bEnabled = DisplayedOption.bEnabled;
+
+			MenuBuilder.AddMenuEntry(
+				FText::FromString(Option.Key),
+				FText::FromString(Option.Description),
+				FSlateIcon(),
+				FUIAction(
+					FExecuteAction::CreateSP(this, &FBlueprintVariableMetadataCustomization::AddMetadata, FName(*Option.Key)),
+					FCanExecuteAction::CreateLambda([bEnabled]() { return bEnabled; }),
+					FIsActionChecked(),
+					FIsActionButtonVisible()
+				)
+			);
+
+			bIsEmpty = false;
+		}
+
+		MenuBuilder.EndSection();
+	}
 
 	if (bIsEmpty)
 	{
@@ -295,86 +390,8 @@ TSharedRef<SWidget> FBlueprintVariableMetadataCustomization::GetAddMetaDataDropd
 			)
 		);
 	}
-
+	
 	return MenuBuilder.MakeWidget();
-}
-
-
-bool FBlueprintVariableMetadataCustomization::IsPropertyAllowed(const FString& Filter) const
-{
-	if (Filter.IsEmpty())
-	{
-		return true;
-	}
-
-	TArray<FName> AllowedClasses;
-	{
-		TArray<FString> Arr;
-		Filter.ParseIntoArray(Arr, TEXT(","));
-		for (FString Str : Arr)
-		{
-			AllowedClasses.Add(FName(Str.TrimStartAndEnd()));
-		}
-	}
-
-
-	FProperty* TargetProperty = PropertyBeingCustomized.Get();
-	if (!TargetProperty)
-	{
-		return false;
-	}
-
-	auto CheckProperty = [&AllowedClasses](FProperty* Property)
-	{
-		if (Property)
-		{
-			if (AllowedClasses.Contains(Property->GetClass()->GetFName()))
-			{
-				return true;
-			}
-			else if (FStructProperty* StructProperty = CastField<FStructProperty>(Property))
-			{
-				if (StructProperty->Struct && AllowedClasses.Contains(StructProperty->Struct->GetFName()))
-				{
-					return true;
-				}
-			}
-		}		
-		return false;
-	};
-
-	if (CheckProperty(TargetProperty))
-	{
-		return true;
-	}
-	else if (FArrayProperty* ArrayProperty = CastField<FArrayProperty>(TargetProperty))
-	{		
-		if (CheckProperty(ArrayProperty->Inner))
-		{
-			return true;
-		}
-	}
-	else if (FSetProperty* SetProperty = CastField<FSetProperty>(TargetProperty))
-	{
-		if (CheckProperty(SetProperty->ElementProp))
-		{
-			return true;
-		}
-	}
-	else if (FMapProperty* MapProperty = CastField<FMapProperty>(TargetProperty))
-	{
-		if (CheckProperty(MapProperty->KeyProp))
-		{
-			return true;
-		}
-
-		if (CheckProperty(MapProperty->ValueProp))
-		{
-			return true;
-		}
-	}
-
-	return false;
 }
 
 void FBlueprintVariableMetadataCustomization::AddMetadata(FName MetaDataKey)
@@ -393,9 +410,9 @@ void FBlueprintVariableMetadataCustomization::AddMetadata(FName MetaDataKey)
 		}
 	}
 
-	const FMetaDataOption* MetaOption = GetDefault<UBlueprintVariableMetadataSettings>()->MetaDataOptions.Find(MetaDataKey);
+	const FMetaDataOption& MetaOption = GetDefault<UBlueprintVariableMetadataSettings>()->GetOption(MetaDataKey);
 
-	FBlueprintEditorUtils::SetBlueprintVariableMetaData(BlueprintPtr.Get(), VariableName, nullptr, MetaDataKey, MetaOption ? MetaOption->DefaultValue : TEXT(""));
+	FBlueprintEditorUtils::SetBlueprintVariableMetaData(BlueprintPtr.Get(), VariableName, nullptr, MetaDataKey, MetaOption.DefaultValue);
 }
 
 void FBlueprintVariableMetadataCustomization::RemoveMetadata(FName MetaDataKey)
@@ -446,6 +463,114 @@ void FBlueprintVariableMetadataCustomization::MetaValueChanged(const FText& NewV
 	{
 		FBlueprintEditorUtils::SetBlueprintVariableMetaData(BlueprintPtr.Get(), VariableName, nullptr, KeyName, NewValue);
 	}
+}
+
+
+TArray<FName> FBlueprintVariableMetadataCustomization::GetPropertyInfo(const FProperty* Property)
+{
+	TArray<FName> Info;
+
+	if (Property)
+	{
+		FName Typename;
+		if (GetPropertyTypeName(Property, Typename))
+		{
+			Info.Add(Typename);
+		}
+
+		if (const FArrayProperty* ArrayProperty = CastField<FArrayProperty>(Property))
+		{
+			if (GetPropertyTypeName(ArrayProperty->Inner, Typename))
+			{
+				Info.Add(Typename);
+			}
+		}
+		else if (const FSetProperty* SetProperty = CastField<FSetProperty>(Property))
+		{
+			if (GetPropertyTypeName(SetProperty->ElementProp, Typename))
+			{
+				Info.Add(Typename);
+			}
+		}
+		else if (const FMapProperty* MapProperty = CastField<FMapProperty>(Property))
+		{
+			if (GetPropertyTypeName(MapProperty->KeyProp, Typename))
+			{
+				Info.Add(Typename);
+			}
+			if (GetPropertyTypeName(MapProperty->ValueProp, Typename))
+			{
+				Info.Add(Typename);
+			}
+		}
+	}
+
+
+	return Info;
+}
+
+bool FBlueprintVariableMetadataCustomization::GetPropertyTypeName(const FProperty* Property, FName& PropertyType)
+{
+	if (Property)
+	{
+		if (const FStructProperty* StructProperty = CastField<FStructProperty>(Property))
+		{
+			if (StructProperty->Struct)
+			{
+				PropertyType = StructProperty->Struct->GetFName();
+				return true;
+			}
+		}
+		else if (Property->GetClass())
+		{
+			PropertyType = Property->GetClass()->GetFName();
+			return true;
+		}
+	}
+
+	PropertyType = NAME_None;
+	return false;
+}
+
+
+bool FBlueprintVariableMetadataCustomization::IsPropertyAllowed(const FProperty* TargetProperty, const FString& Filter)
+{
+	if (Filter.IsEmpty())
+	{
+		return true;
+	}
+
+	if (!TargetProperty)
+	{
+		return false;
+	}
+
+	TArray<FName> AllowedClasses;
+	{
+		TArray<FString> Arr;
+		Filter.ParseIntoArray(Arr, TEXT(","));
+		for (FString Str : Arr)
+		{
+			AllowedClasses.Add(FName(Str.TrimStartAndEnd()));
+		}
+	}
+
+	if (AllowedClasses.Num() == 0)
+	{
+		return true;
+	}
+	
+	TArray<FName> Info = GetPropertyInfo(TargetProperty);
+
+	for (const FName& PropClass : Info)
+	{
+		if (AllowedClasses.Contains(PropClass))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 #undef LOCTEXT_NAMESPACE
