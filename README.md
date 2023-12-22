@@ -14,7 +14,7 @@ Use for metas that affect logic or blueprint compilation is discouraged and shou
 - Using 'Categories' meta with GameplayTags
 - Hiding thumbnails
 - Class and Asset picker filtering
-- Adding GetOptions to String selectors(doesn't work with functions created in blueprint)
+- Adding GetOptions to String selectors( Must have one return parameter named 'ReturnValue')
 
 Adds button to Advanced category in blueprint variables. Options are filtered by Variable, Container, Blueprint types
 
